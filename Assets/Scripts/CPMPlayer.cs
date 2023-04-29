@@ -26,11 +26,16 @@
  *
  */
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using TreeEditor;
+using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
- //Contains the command the user wishes upon the character
+//Contains the command the user wishes upon the character
 struct Cmd
 {
     public float forwardMove;
@@ -51,7 +56,8 @@ public class CPMPlayer : MonoBehaviour
     public float friction = 5.5f; //Ground friction
 
     /* Movement stuff */
-    public float moveSpeed = 5.046875f;                // Ground move speed
+    public float moveSpeed = 5.046875f;            // Ground move speed
+    public float sprintSpeed = 7.5703125f;          //Ground sprint speed
     public float runAcceleration = 14.0f;         // Ground accel
     public float runDeacceleration = 10.0f;       // Deacceleration that occurs when running on the ground
     public float airAcceleration = 1.0f;          // Air accel
@@ -74,6 +80,10 @@ public class CPMPlayer : MonoBehaviour
 
     private CharacterController _controller;
 
+    private LineRenderer lineRenderer;
+
+    private Rigidbody rb;
+
     // Camera rotations
     private float rotX = 0.0f;
     private float rotY = 0.0f;
@@ -91,11 +101,29 @@ public class CPMPlayer : MonoBehaviour
     // Player commands, stores wish commands that the player asks for (Forward, back, jump, etc)
     private Cmd _cmd;
 
+
+
+    //Sliding stuff
+    Vector3 surfaceNormal;
+    float slopeAngle;
+    bool isGrounded;
+    bool isSliding;
+
+
+    //Bounce stuff (prediction)
+    float distanceToGround;
+    public int framesAhead = 10;
+    bool b_HasBounced;
+    bool b_hasJumped;
+    bool b_ShouldIBounce;
+    int bounceCounter = 0;
+
+
     private void Start()
     {
         // Hide the cursor
-        Cursor.visible = false;
-        Cursor.lockState = CursorLockMode.Locked;
+        UnityEngine.Cursor.visible = false;
+        UnityEngine.Cursor.lockState = CursorLockMode.Locked;
 
         if (playerView == null)
         {
@@ -111,10 +139,20 @@ public class CPMPlayer : MonoBehaviour
             transform.position.z);
 
         _controller = GetComponent<CharacterController>();
+        rb = GetComponent<Rigidbody>();
+        lineRenderer = GetComponent<LineRenderer>();
     }
 
     private void Update()
     {
+        //Apply sliding if neccessary
+        if (_controller.isGrounded)
+        {
+            isGrounded = true;
+        }
+        else isGrounded = false;
+
+
 
         // Do FPS calculation
         frameCount++;
@@ -128,9 +166,9 @@ public class CPMPlayer : MonoBehaviour
 
 
         /* Ensure that the cursor is locked into the screen */
-        if (Cursor.lockState != CursorLockMode.Locked) {
+        if (UnityEngine.Cursor.lockState != CursorLockMode.Locked) {
             if (Input.GetButtonDown("Fire1"))
-                Cursor.lockState = CursorLockMode.Locked;
+                UnityEngine.Cursor.lockState = CursorLockMode.Locked;
         }
 
         /* Camera rotation stuff, mouse controls this shit */
@@ -170,6 +208,17 @@ public class CPMPlayer : MonoBehaviour
             transform.position.x,
             transform.position.y + playerViewYOffset,
             transform.position.z);
+
+        //Should call these first since they will want to override our normal movements
+        Sliding();
+
+
+        HasBounced(ref isGrounded, ref b_hasJumped, ref b_HasBounced, ref b_ShouldIBounce);
+        if (slopeAngle > _controller.slopeLimit && surfaceNormal.y > 0.30000001) PM_ProjectVelocity(surfaceNormal, ref playerVelocity, framesAhead);
+           
+        
+
+        DebugDrawing();
     }
 
      /*******************************************************************************************************\
@@ -235,11 +284,11 @@ public class CPMPlayer : MonoBehaviour
     {
         Vector3 wishdir;
 
-        // Do not apply friction if the player is queueing up the next jump
+        // Apply friction if the player is queueing up the next jump (bhopping)
         if (!wishJump)
             ApplyFriction(1.0f);
         else
-            ApplyFriction(0);
+            ApplyFriction(0f);
 
         SetMovementDir();
 
@@ -249,6 +298,15 @@ public class CPMPlayer : MonoBehaviour
         moveDirectionNorm = wishdir;
 
         var wishspeed = wishdir.magnitude;
+
+        //Sprinting
+        if (Input.GetButton("Sprint") && _cmd.forwardMove > 0)
+        {
+            Debug.Log("sprinting");
+            moveSpeed = sprintSpeed;
+        }
+        else moveSpeed = 5.046875f;
+
         wishspeed *= moveSpeed;
 
         Accelerate(wishdir, wishspeed, runAcceleration);
@@ -302,7 +360,8 @@ public class CPMPlayer : MonoBehaviour
         float accelspeed;
         float currentspeed;
         float value;
-        float stopspeed = 2;
+        float stopspeed = 2.65625f;
+
 
         currentspeed = Vector3.Dot(playerVelocity, wishdir);
         addspeed = wishspeed - currentspeed;
@@ -316,52 +375,213 @@ public class CPMPlayer : MonoBehaviour
                 else
                     value = stopspeed;
             }
-
+            
             accelspeed = accel * Time.deltaTime * value;
             if (accelspeed > addspeed)
                 accelspeed = addspeed;
-
+            
             playerVelocity.x += accelspeed * wishdir.x;
             playerVelocity.z += accelspeed * wishdir.z;
+            //playerVelocity.y += accelspeed * playerVelocity.y * Time.deltaTime;
+
+            Debug.Log("FrameTime: " + 1.0 / 333 + " | Accelspeed: " + accel + " | WishSpeed: " + wishspeed);
 
         }
+
+        
 
         //playerVelocity.x = Mathf.Round(playerVelocity.x) * Time.deltaTime;
         //playerVelocity.y = Mathf.Round(playerVelocity.y) * Time.deltaTime;
         //playerVelocity.z = Mathf.Round(playerVelocity.z) * Time.deltaTime;
     }
 
-   //private void PM_ClipVelocity(Vector3 inVec, Vector3 normal, Vector3 outVec, float overbounce)
-   //{
-   //    float backoff;
-   //    float change;
-   //    int i;
-   //
-   //    backoff = DotProduct(in, normal);
-   //
-   //    if (backoff < 0)
-   //    {
-   //        backoff *= overbounce;
-   //    }
-   //    else
-   //    {
-   //        backoff /= overbounce;
-   //    }
-   //
-   //    for (i = 0; i < 3; i++)
-   //    {
-   //        change = normal[i] * backoff;
-	//	out[i] = in[i] -change;
-   //    }
-   //}
+    private void PM_ClipVelocity(ref Vector3 inVec, Vector3 normal, float overbounce)
+    {
+        //Ported from Q3 pretty buggy atm
+        float backoff;
+        float change;
+        int i;
+        
+        backoff = Vector3.Dot(inVec, normal);
+        
+        if (backoff < 0)
+        {
+            backoff *= overbounce;
+        }
+        else
+        {
+            backoff /= overbounce;
+        }
+        
+        for (i = 0; i < 3; i++)
+        {
+            change = normal[i] * backoff;
+            inVec[i] -= change;
+        }
+    }
+
+    private void Sliding()
+    {
+        ////Raycast for slopes
+        RaycastHit hit;
+        
+        // Cast a ray from the character's position downwards
+        if (Physics.Raycast(transform.position, -Vector3.up, out hit))
+        {
+            // Get the normal vector of the surface the ray hit
+            surfaceNormal = hit.normal;
+        }
+        
+        slopeAngle = Vector3.Angle(Vector3.up, surfaceNormal);
+        
+        if (slopeAngle > _controller.slopeLimit && Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit1, _controller.height / 2 + .5f))
+        {
+            
+            isSliding = true;
+            PM_ClipVelocity(ref playerVelocity, surfaceNormal, 1.001f);
+        }
+        else
+        {
+            isSliding = false;
+        }
+        
+    }
+
+    private void DebugDrawing()
+    {
+
+        //Public vars for read only purposes (external use)
+        Debug.DrawLine(_controller.transform.position, transform.position + transform.forward , Color.red);
+        Debug.DrawLine(_controller.transform.position, transform.position + playerVelocity , Color.blue);
+        Debug.DrawLine(_controller.transform.position, transform.position + moveDirectionNorm, Color.green);
+
+    }
+
+    // x = 0
+    // z = 1
+    // y = 2
+    private void PM_ProjectVelocity(Vector3 normalVector, ref Vector3 currentVelocity, int framesAhead)
+    {
+
+        float speed2DSquared = currentVelocity.z * currentVelocity.z + currentVelocity.x * currentVelocity.x;
+        bool isNormalHorizontal = Math.Abs(normalVector.z) < 0.001;
+
+        // Copy over input velocity to output
+        if (isNormalHorizontal || speed2DSquared == 0.0)
+        {
+            return;
+        }
+
+        // Player is actually moving and its not a usual wall
+        else
+        {
+            float unknownDot = normalVector.z * currentVelocity.z + currentVelocity.x * normalVector.x;
+
+            // Black ops 1 pdb calls it that, not sure yet
+            float newZ = -unknownDot / normalVector.y;
+
+            float speedSquared = currentVelocity.z * currentVelocity.z + currentVelocity.x * currentVelocity.x + currentVelocity.y + currentVelocity.y;
+            float newSpeedSquared = speed2DSquared + newZ * newZ;
+
+            float lengthScale = Mathf.Sqrt((currentVelocity.y * currentVelocity.y + speedSquared) / (speedSquared + newZ * newZ));
+
+            //Raycast prediction
+            Vector3 futurePos = transform.position + currentVelocity * Time.fixedDeltaTime * framesAhead;
+             RaycastHit hit;
+             if (Physics.Raycast(futurePos, Vector3.down, out hit, distanceToGround + 8 * Time.fixedDeltaTime * framesAhead))
+             {
+                if ((float)lengthScale < 1.0 || newZ < 0.0 || currentVelocity.z > 0.0)
+                {
+                    currentVelocity.x = (float)lengthScale * currentVelocity.x;
+                    currentVelocity.z = (float)lengthScale * currentVelocity.z;
+                    currentVelocity.y = (float)lengthScale * newZ;
+
+                    bounceCounter++;
+
+                    if (!isGrounded)
+                    {
+                        //notificationManager.notify("Doing bounce!");
+                        Debug.Log("Doing bounce!");
+
+                    }
+                }
+                Debug.Log("lengthScale: " + (float)lengthScale + " | newZ: " + newZ + " | curVelocity: " + currentVelocity.z);
+            }
+             //distanceToGround = hit.distance;
+
+            
+
+        }
+    }
+
+    //private void PM_ProjectVelocity(Vector3 normal, ref Vector3 velIn, int framesAhead)
+    //{
+    //    float speedSqrd = velIn.z * velIn.z + velIn.x * velIn.x;
+    //    
+    //    if (normal.y < 0.001f || speedSqrd == 0.0f)
+    //    {
+    //        return;
+    //    }
+    //
+    //    else
+    //    {
+    //        float normalized = -(normal.z * velIn.z + velIn.x * normal.x) / normal.y;
+    //        float projection = Mathf.Sqrt((velIn.y * velIn.y + speedSqrd) / (speedSqrd + normalized * normalized));
+    //
+    //        //Raycast prediction
+    //        Vector3 futurePos = transform.position + velIn * Time.fixedDeltaTime * framesAhead;
+    //        RaycastHit hit;
+    //        if (Physics.Raycast(futurePos, Vector3.down, out hit, distanceToGround + 8 * Time.fixedDeltaTime * framesAhead))
+    //        {
+    //            if (projection < 1f || normalized < 0f || velIn.y > 0f)
+    //            {
+    //                velIn.x = projection * velIn.x;
+    //                velIn.z = projection * velIn.z;
+    //                velIn.y = projection * normalized;
+    //                b_HasBounced = true;
+    //                bounceCounter++;
+    //            }
+    //            Debug.Log("Projection: " + projection + " | Normalized: " + normalized + " | velIn.y: " + velIn.y);
+    //        }
+    //        //distanceToGround = hit.distance;
+    //    }
+    //}
+
+    private void HasBounced(ref bool isGrounded, ref bool b_hasJumped, ref bool b_HasBounced, ref bool b_ShouldIBounce)
+    {
+        //Requesting bounce
+        if (isGrounded)
+        {
+            b_hasJumped = false;
+            b_HasBounced = false;
+            b_ShouldIBounce = true;
+        }
+        //else if (b_HasBounced && !isGrounded) //If we haven't bounced we need to reset our states so we can bounce in the future.
+        //{
+        //    b_HasBounced = false;
+        //    b_hasJumped = true;
+        //    b_ShouldIBounce = false;
+        //}
+        b_ShouldIBounce = true;
+    }
+
 
     private void OnGUI()
     {
+        style.fontSize = 28;
         GUI.Label(new Rect(0, 0, 400, 100), "FPS: " + fps, style);
         var ups = _controller.velocity;
         ups.y = 0;
-        GUI.Label(new Rect(0, 15, 400, 100), "Speed: " + Mathf.Round(ups.magnitude * 100) / 100 + "ups", style);
-        GUI.Label(new Rect(0, 30, 400, 100), "Top Speed: " + Mathf.Round(playerTopVelocity * 100) / 100 + "ups", style);
+        GUI.Label(new Rect(0, 25, 400, 100), "Speed: " + Mathf.Round(ups.magnitude * 100) / 100 + "ups", style);
+        GUI.Label(new Rect(0, 50, 400, 100), "Top Speed: " + Mathf.Round(playerTopVelocity * 100) / 100 + "ups", style);
+        GUI.Label(new Rect(0, 75, 400, 100), "Slope Angle: " + Mathf.Round(slopeAngle * 100) / 100, style);
+
+        GUI.Label(new Rect(0, 125, 400, 100), "b_HasBounced: " + b_HasBounced, style);
+        GUI.Label(new Rect(0, 150, 400, 100), "b_hasJumped: " + b_hasJumped, style);
+        GUI.Label(new Rect(0, 175, 400, 100), "b_ShouldIBounce: " + b_ShouldIBounce, style);
+        GUI.Label(new Rect(0, 200, 400, 100), "isGrounded: " + isGrounded, style);
+
+        GUI.Label(new Rect(0, 225, 400, 100), "bounce counter: " + bounceCounter, style);
     }
 }
 
