@@ -120,6 +120,7 @@ public class CPMPlayer : MonoBehaviour
 
     //Strafing stuff
     float fpsCJ = 125;
+    float frametimeQ;
 
     //Load & Save position vars
     Vector3 saveAngles;
@@ -152,6 +153,7 @@ public class CPMPlayer : MonoBehaviour
 
     private void Update()
     {
+
         //Apply sliding if neccessary
         if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, _controller.height / 2 + 0.1f))
         {
@@ -159,7 +161,16 @@ public class CPMPlayer : MonoBehaviour
         }
         else isGrounded = false;
 
-       
+        QualitySettings.vSyncCount = 0;
+
+        if(Input.GetKeyDown(KeyCode.E))
+        {
+            Application.targetFrameRate = 60;
+        }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            Application.targetFrameRate = 333;
+        }
 
 
         // Do FPS calculation
@@ -264,6 +275,7 @@ public class CPMPlayer : MonoBehaviour
     */
     private void AirMove()
     {
+        moveSpeed = 5.046875f;
         Vector3 wishdir;
         float wishvel = airAcceleration;
         
@@ -281,8 +293,15 @@ public class CPMPlayer : MonoBehaviour
 
         playerVelocity = Accelerate(wishdir, wishspeed, 1) * 0.0265625f;
 
+        float gravityLocal = toQuakeUnits(gravity);
+        float gravityPerFrame = MathF.Round(gravityLocal / fpsCJ);
+        //gravityPerFrame = toUnityUnits(gravityPerFrame);
+        float resultingGravity = MathF.Abs(toUnityUnits(gravityPerFrame) * Time.deltaTime * fpsCJ);
+
         // Apply gravity
-        playerVelocity.y -= gravity * Time.deltaTime;
+        playerVelocity.y -= resultingGravity;
+        //playerVelocity.y = MathF.Round(playerVelocity.y);
+        //Debug.Log("Gravity: " + gravityLocal + " | GravityPFrame: " + gravityPerFrame + " | Resulting Gravity: " + (gravityPerFrame * frametimeQ));
     }
 
     /**
@@ -316,7 +335,9 @@ public class CPMPlayer : MonoBehaviour
 
         wishspeed *= moveSpeed;
 
-        playerVelocity = Accelerate(wishdir, wishspeed, runAcceleration) * 0.0265625f;
+        float runAccelTimeScaled = runAcceleration * fpsCJ;
+
+        playerVelocity = Accelerate(wishdir, wishspeed, runAccelTimeScaled) * 0.0265625f;
 
         // Reset the gravity velocity
         playerVelocity.y = -gravity * Time.deltaTime;
@@ -347,7 +368,7 @@ public class CPMPlayer : MonoBehaviour
         if(_controller.isGrounded)
         {
             control = speed < runDeacceleration ? runDeacceleration : speed;
-            drop = control * friction * Time.deltaTime * t;
+            drop = control * friction *  frametimeQ * t;
         }
 
         newspeed = speed - drop;
@@ -393,8 +414,9 @@ public class CPMPlayer : MonoBehaviour
             fpsCJ = 500;
         }
 
-        float frametimeQ = 1 / fpsCJ;
+        frametimeQ = 1 / fpsCJ;
 
+       
 
         currentspeedQ = Vector3.Dot(playerVelocityQ, wishdir);
         addspeedQ = wishspeedQ - currentspeedQ;
@@ -415,18 +437,13 @@ public class CPMPlayer : MonoBehaviour
 
             playerVelocityQ.x += accelspeedQ * wishdir.x;
             playerVelocityQ.z += accelspeedQ * wishdir.z;
-            playerVelocity.y += accelspeedQ * playerVelocity.y * Time.deltaTime;
-            //Debug.Log("FrameTime: " + 1.0 / 333 + " | Accelspeed: " + accelspeedQ + " Accel: " + accel + "WishSpeed: " + wishspeedQ);
+            playerVelocity.y += accelspeedQ * playerVelocity.y * frametimeQ;
+
         }
-        
 
         playerVelocityQ.x = Mathf.Round(playerVelocityQ.x);
         playerVelocityQ.y = Mathf.Round(playerVelocityQ.y);
         playerVelocityQ.z = Mathf.Round(playerVelocityQ.z);
-        //Debug.Log(frametimeQ);
-        //
-        //
-        //Debug.Log(playerVelocity.y);
 
         return playerVelocityQ;
     }
@@ -601,6 +618,16 @@ public class CPMPlayer : MonoBehaviour
         b_ShouldIBounce = true;
     }
 
+    private float toQuakeUnits(float UnityVal)
+    {
+        return UnityVal / .0265625f;
+    }
+
+    private float toUnityUnits(float QuakeVal)
+    {
+        return QuakeVal * .0265625f;
+    }
+
     private void OnGUI()
     {
         style.fontSize = 28;
@@ -618,6 +645,7 @@ public class CPMPlayer : MonoBehaviour
 
         GUI.Label(new Rect(0, 225, 400, 100), "bounce counter: " + bounceCounter, style);
         GUI.Label(new Rect(0, 250, 400, 100), "fpsCJ: " + fpsCJ, style);
+        GUI.Label(new Rect(0, 275, 400, 100), "g_speed: " + moveSpeed / 0.0265625f, style);
     }
 }
 
