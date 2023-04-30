@@ -118,6 +118,9 @@ public class CPMPlayer : MonoBehaviour
     bool b_ShouldIBounce;
     int bounceCounter = 0;
 
+    //Strafing stuff
+    float fpsCJ = 125;
+
 
     private void Start()
     {
@@ -271,7 +274,7 @@ public class CPMPlayer : MonoBehaviour
         moveDirectionNorm = wishdir;
 
 
-        Accelerate(wishdir, wishspeed, 1);
+        playerVelocity = Accelerate(wishdir, wishspeed, 1) * 0.0265625f;
 
         // Apply gravity
         playerVelocity.y -= gravity * Time.deltaTime;
@@ -302,14 +305,13 @@ public class CPMPlayer : MonoBehaviour
         //Sprinting
         if (Input.GetButton("Sprint") && _cmd.forwardMove > 0)
         {
-            Debug.Log("sprinting");
             moveSpeed = sprintSpeed;
         }
         else moveSpeed = 5.046875f;
 
         wishspeed *= moveSpeed;
 
-        Accelerate(wishdir, wishspeed, runAcceleration);
+        playerVelocity = Accelerate(wishdir, wishspeed, runAcceleration) * 0.0265625f;
 
         // Reset the gravity velocity
         playerVelocity.y = -gravity * Time.deltaTime;
@@ -354,45 +356,74 @@ public class CPMPlayer : MonoBehaviour
         playerVelocity.z *= newspeed;
     }
 
-    private void Accelerate(Vector3 wishdir, float wishspeed, float accel)
+    private Vector3 Accelerate(Vector3 wishdir, float wishspeed, float accel)
     {
-        float addspeed;
-        float accelspeed;
-        float currentspeed;
-        float value;
-        float stopspeed = 2.65625f;
+        float addspeedQ;
+        float accelspeedQ;
+        float currentspeedQ;
+        float valueQ;
+
+        //Quake specific values
+        float stopspeedQ = 100f;
+        Vector3 playerVelocityQ = playerVelocity / 0.0265625f;
+        Vector3 wishdirQ = wishdir / 0.0265625f;
+        float wishspeedQ = wishspeed / 0.0265625f;
+        float accelQ = accel;
 
 
-        currentspeed = Vector3.Dot(playerVelocity, wishdir);
-        addspeed = wishspeed - currentspeed;
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            fpsCJ = 125;
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            fpsCJ = 250;
+        }
+        else if (Input.GetKeyDown(KeyCode.C))
+        {
+            fpsCJ = 333;
+        }
+        else if (Input.GetKeyDown(KeyCode.V))
+        {
+            fpsCJ = 500;
+        }
 
-        if (addspeed > 0)
+        float frametimeQ = 1 / fpsCJ;
+
+
+        currentspeedQ = Vector3.Dot(playerVelocityQ, wishdir);
+        addspeedQ = wishspeedQ - currentspeedQ;
+
+        if (addspeedQ > 0)
         {
             //From BO1 stopspeed, gradually slows down player until they reach a threshold
             {
-                if (stopspeed <= wishspeed)
-                    value = wishspeed;
+                if (stopspeedQ <= wishspeedQ)
+                    valueQ = wishspeedQ;
                 else
-                    value = stopspeed;
+                    valueQ = stopspeedQ;
             }
-            
-            accelspeed = accel * Time.deltaTime * value;
-            if (accelspeed > addspeed)
-                accelspeed = addspeed;
-            
-            playerVelocity.x += accelspeed * wishdir.x;
-            playerVelocity.z += accelspeed * wishdir.z;
-            //playerVelocity.y += accelspeed * playerVelocity.y * Time.deltaTime;
 
-            Debug.Log("FrameTime: " + 1.0 / 333 + " | Accelspeed: " + accel + " | WishSpeed: " + wishspeed);
+            accelspeedQ = accelQ * frametimeQ * wishspeedQ;
+            if (accelspeedQ > addspeedQ)
+                accelspeedQ = addspeedQ;
 
+            playerVelocityQ.x += accelspeedQ * wishdir.x;
+            playerVelocityQ.z += accelspeedQ * wishdir.z;
+            playerVelocity.y += accelspeedQ * playerVelocity.y * Time.deltaTime;
+            //Debug.Log("FrameTime: " + 1.0 / 333 + " | Accelspeed: " + accelspeedQ + " Accel: " + accel + "WishSpeed: " + wishspeedQ);
         }
-
         
 
-        //playerVelocity.x = Mathf.Round(playerVelocity.x) * Time.deltaTime;
-        //playerVelocity.y = Mathf.Round(playerVelocity.y) * Time.deltaTime;
-        //playerVelocity.z = Mathf.Round(playerVelocity.z) * Time.deltaTime;
+        playerVelocityQ.x = Mathf.Round(playerVelocityQ.x);
+        playerVelocityQ.y = Mathf.Round(playerVelocityQ.y);
+        playerVelocityQ.z = Mathf.Round(playerVelocityQ.z);
+        Debug.Log(frametimeQ);
+
+
+
+
+        return playerVelocityQ;
     }
 
     private void PM_ClipVelocity(ref Vector3 inVec, Vector3 normal, float overbounce)
@@ -582,6 +613,7 @@ public class CPMPlayer : MonoBehaviour
         GUI.Label(new Rect(0, 200, 400, 100), "isGrounded: " + isGrounded, style);
 
         GUI.Label(new Rect(0, 225, 400, 100), "bounce counter: " + bounceCounter, style);
+        GUI.Label(new Rect(0, 250, 400, 100), "fpsCJ: " + fpsCJ, style);
     }
 }
 
