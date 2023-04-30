@@ -1,22 +1,19 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 public class SaveLoadPosition : MonoBehaviour
 {
-    private Vector3 savePosition;
-    private Vector3 saveAngles;
+    public static Vector3 savePosition;
+    public static Vector3 saveAngles;
     private CharacterController Jumper;
-    private Camera CameraMain;
-    public Transform playerView;
+    private Camera Camera;
 
     private void Start()
     {
         // Get the CharacterController component attached to this game object
         Jumper = GetComponent<CharacterController>();
-        CameraMain = GetComponent<Camera>();
+        Camera = Jumper.GetComponentInChildren<Camera>();
 
+        savePosition = Jumper.transform.position;
     }
 
     private void Update()
@@ -28,12 +25,12 @@ public class SaveLoadPosition : MonoBehaviour
     private void SavePosition()
     {
         //Save Position
-        if (Input.GetKeyDown(KeyCode.V) && Jumper.isGrounded)
+        if (Input.GetKeyDown(KeyCode.V) && CPMPlayer.isGrounded)
         {
             savePosition = Jumper.transform.position;
             saveAngles = transform.rotation.eulerAngles;
 
-            Debug.Log("saved at position: " + Jumper.transform.position);
+            Debug.Log("saved: " + Jumper.transform.position);
 
         }
     }
@@ -43,19 +40,16 @@ public class SaveLoadPosition : MonoBehaviour
         //Load Position
         if (Input.GetKeyDown(KeyCode.F))
         {
-
-      
             Jumper.enabled = false;
             this.GetComponent<CPMPlayer>().enabled = false;
-            {
-                Jumper.transform.position = savePosition;
 
-            }
-            
+            Jumper.transform.position = savePosition;
+            CPMPlayer.playerVelocity = Vector3.zero;
+            Camera.transform.rotation = Quaternion.Euler(saveAngles);
+
             Jumper.enabled = true;
             this.GetComponent<CPMPlayer>().enabled = true;
-
-            Debug.Log("loaded to position: " + Jumper.transform.position);
+            Debug.Log("loaded: " + Jumper.transform.position);
         }
     }
 }

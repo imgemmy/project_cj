@@ -89,7 +89,7 @@ public class CPMPlayer : MonoBehaviour
     private float rotY = 0.0f;
 
     private Vector3 moveDirectionNorm = Vector3.zero;
-    private Vector3 playerVelocity = Vector3.zero;
+    public static Vector3 playerVelocity = Vector3.zero;
     private float playerTopVelocity = 0.0f;
 
     // Q3: players can queue the next jump just before he hits the ground
@@ -106,7 +106,7 @@ public class CPMPlayer : MonoBehaviour
     //Sliding stuff
     Vector3 surfaceNormal;
     float slopeAngle;
-    bool isGrounded;
+    public static bool isGrounded;
     bool isSliding;
 
 
@@ -120,6 +120,10 @@ public class CPMPlayer : MonoBehaviour
 
     //Strafing stuff
     float fpsCJ = 125;
+
+    //Load & Save position vars
+    Vector3 saveAngles;
+    Vector3 savePosition;
 
 
     private void Start()
@@ -149,12 +153,13 @@ public class CPMPlayer : MonoBehaviour
     private void Update()
     {
         //Apply sliding if neccessary
-        if (_controller.isGrounded)
+        if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, _controller.height / 2 + 0.1f))
         {
             isGrounded = true;
         }
         else isGrounded = false;
 
+       
 
 
         // Do FPS calculation
@@ -177,6 +182,8 @@ public class CPMPlayer : MonoBehaviour
         /* Camera rotation stuff, mouse controls this shit */
         rotX -= Input.GetAxisRaw("Mouse Y") * xMouseSensitivity * 0.02f;
         rotY += Input.GetAxisRaw("Mouse X") * yMouseSensitivity * 0.02f;
+      
+
 
         // Clamp the X rotation
         if(rotX < -90)
@@ -218,8 +225,6 @@ public class CPMPlayer : MonoBehaviour
 
         HasBounced(ref isGrounded, ref b_hasJumped, ref b_HasBounced, ref b_ShouldIBounce);
         if (slopeAngle > _controller.slopeLimit && surfaceNormal.y > 0.30000001) PM_ProjectVelocity(surfaceNormal, ref playerVelocity, framesAhead);
-           
-        
 
         DebugDrawing();
     }
@@ -418,10 +423,10 @@ public class CPMPlayer : MonoBehaviour
         playerVelocityQ.x = Mathf.Round(playerVelocityQ.x);
         playerVelocityQ.y = Mathf.Round(playerVelocityQ.y);
         playerVelocityQ.z = Mathf.Round(playerVelocityQ.z);
-        Debug.Log(frametimeQ);
-
-
-
+        //Debug.Log(frametimeQ);
+        //
+        //
+        //Debug.Log(playerVelocity.y);
 
         return playerVelocityQ;
     }
@@ -595,7 +600,6 @@ public class CPMPlayer : MonoBehaviour
         //}
         b_ShouldIBounce = true;
     }
-
 
     private void OnGUI()
     {
