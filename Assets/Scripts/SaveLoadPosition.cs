@@ -25,9 +25,10 @@ public class SaveLoadPosition : MonoBehaviour
     private void SavePosition()
     {
         //Save Position
-        if (Input.GetKeyDown(KeyCode.V) && CPMPlayer.isGrounded)
+        if (Input.GetKeyDown(KeyCode.V) && JumperMovement.isOnGround)
         {
             savePosition = Jumper.transform.position;
+            savePosition.y = savePosition.y + .5f;
             saveAngles = transform.rotation.eulerAngles;
 
             Debug.Log("saved: " + Jumper.transform.position);
@@ -41,14 +42,14 @@ public class SaveLoadPosition : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F))
         {
             Jumper.enabled = false;
-            this.GetComponent<CPMPlayer>().enabled = false;
+            this.GetComponent<JumperMovement>().enabled = false;
 
-            Jumper.transform.position = savePosition;
             CPMPlayer.playerVelocity = Vector3.zero;
+            Jumper.transform.position = savePosition;
             Camera.transform.rotation = Quaternion.Euler(saveAngles);
 
             Jumper.enabled = true;
-            this.GetComponent<CPMPlayer>().enabled = true;
+            this.GetComponent<JumperMovement>().enabled = true;
             Debug.Log("loaded: " + Jumper.transform.position);
         }
     }

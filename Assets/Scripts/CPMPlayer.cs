@@ -153,9 +153,11 @@ public class CPMPlayer : MonoBehaviour
 
     private void Update()
     {
+        //CJ fps switches
+        fpsSwitching();
 
         //Apply sliding if neccessary
-        if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, _controller.height / 2 + 0.1f))
+        if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, _controller.height / 2 + 0.2f))
         {
             isGrounded = true;
         }
@@ -170,6 +172,10 @@ public class CPMPlayer : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.R))
         {
             Application.targetFrameRate = 333;
+        }
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            Application.targetFrameRate = 1000;
         }
 
 
@@ -193,7 +199,7 @@ public class CPMPlayer : MonoBehaviour
         /* Camera rotation stuff, mouse controls this shit */
         rotX -= Input.GetAxisRaw("Mouse Y") * xMouseSensitivity * 0.02f;
         rotY += Input.GetAxisRaw("Mouse X") * yMouseSensitivity * 0.02f;
-      
+
 
 
         // Clamp the X rotation
@@ -209,9 +215,9 @@ public class CPMPlayer : MonoBehaviour
 
         /* Movement, here's the important part */
         QueueJump();
-        if(_controller.isGrounded)
+        if(isGrounded)
             GroundMove();
-        else if(!_controller.isGrounded)
+        else if(!isGrounded)
             AirMove();
 
         // Move the controller
@@ -240,9 +246,10 @@ public class CPMPlayer : MonoBehaviour
         DebugDrawing();
     }
 
-     /*******************************************************************************************************\
-    |* MOVEMENT
-    \*******************************************************************************************************/
+
+    /*******************************************************************************************************\
+   |* MOVEMENT
+   \*******************************************************************************************************/
 
     /**
      * Sets the movement direction based on player input
@@ -277,27 +284,32 @@ public class CPMPlayer : MonoBehaviour
     {
         moveSpeed = 5.046875f;
         Vector3 wishdir;
-        float wishvel = airAcceleration;
         
         SetMovementDir();
-
+        
         wishdir =  new Vector3(_cmd.rightMove, 0, _cmd.forwardMove);
         wishdir = transform.TransformDirection(wishdir);
 
+
+        //Old Way
         float wishspeed = wishdir.magnitude;
         wishspeed *= moveSpeed;
 
+        //float wishspeed = VectorNormalize(ref wishdir) * moveSpeed;
+        Debug.Log(wishspeed);
+        
+
         wishdir.Normalize();
         moveDirectionNorm = wishdir;
-
-
+        
+        
         playerVelocity = Accelerate(wishdir, wishspeed, 1) * 0.0265625f;
-
+        
         float gravityLocal = toQuakeUnits(gravity);
         float gravityPerFrame = MathF.Round(gravityLocal / fpsCJ);
         //gravityPerFrame = toUnityUnits(gravityPerFrame);
         float resultingGravity = MathF.Abs(toUnityUnits(gravityPerFrame) * Time.deltaTime * fpsCJ);
-
+        
         // Apply gravity
         playerVelocity.y -= resultingGravity;
         //playerVelocity.y = MathF.Round(playerVelocity.y);
@@ -312,7 +324,7 @@ public class CPMPlayer : MonoBehaviour
         Vector3 wishdir;
 
         // Apply friction if the player is queueing up the next jump (bhopping)
-        if (!wishJump)
+        if (isGrounded)
             ApplyFriction(1.0f);
         else
             ApplyFriction(0f);
@@ -365,10 +377,11 @@ public class CPMPlayer : MonoBehaviour
         drop = 0.0f;
 
         /* Only if the player is on the ground then apply friction */
-        if(_controller.isGrounded)
+        if(isGrounded)
         {
             control = speed < runDeacceleration ? runDeacceleration : speed;
-            drop = control * friction *  frametimeQ * t;
+            //This may be wrong ( * fpsCJ)
+            drop = control * friction * Time.deltaTime * t;
         }
 
         newspeed = speed - drop;
@@ -390,31 +403,14 @@ public class CPMPlayer : MonoBehaviour
         float valueQ;
 
         //Quake specific values
-        float stopspeedQ = 100f;
+        float stopspeedQ = 2.65625f;
         Vector3 playerVelocityQ = playerVelocity / 0.0265625f;
         Vector3 wishdirQ = wishdir / 0.0265625f;
         float wishspeedQ = wishspeed / 0.0265625f;
         float accelQ = accel;
 
 
-        if (Input.GetKeyDown(KeyCode.Z))
-        {
-            fpsCJ = 125;
-        }
-        else if (Input.GetKeyDown(KeyCode.X))
-        {
-            fpsCJ = 250;
-        }
-        else if (Input.GetKeyDown(KeyCode.C))
-        {
-            fpsCJ = 333;
-        }
-        else if (Input.GetKeyDown(KeyCode.V))
-        {
-            fpsCJ = 500;
-        }
 
-        frametimeQ = 1 / fpsCJ;
 
        
 
@@ -430,14 +426,17 @@ public class CPMPlayer : MonoBehaviour
                 else
                     valueQ = stopspeedQ;
             }
+            float timeRatio = Time.deltaTime / frametimeQ;
 
-            accelspeedQ = accelQ * frametimeQ * wishspeedQ;
+            accelspeedQ = accelQ * Time.deltaTime * wishspeedQ;
             if (accelspeedQ > addspeedQ)
                 accelspeedQ = addspeedQ;
 
             playerVelocityQ.x += accelspeedQ * wishdir.x;
             playerVelocityQ.z += accelspeedQ * wishdir.z;
-            playerVelocity.y += accelspeedQ * playerVelocity.y * frametimeQ;
+            playerVelocity.y += accelspeedQ * wishdir.y;
+
+            //Debug.Log("AccelSpeed: " + MathF.Round(accelspeedQ) + " | WishSpeed: " + MathF.Round(wishspeedQ) + " | AccelQ: " + MathF.Round(accelQ) + " | AddSpeed: " + addspeedQ);
 
         }
 
@@ -502,12 +501,10 @@ public class CPMPlayer : MonoBehaviour
 
     private void DebugDrawing()
     {
-
         //Public vars for read only purposes (external use)
         Debug.DrawLine(_controller.transform.position, transform.position + transform.forward , Color.red);
         Debug.DrawLine(_controller.transform.position, transform.position + playerVelocity , Color.blue);
         Debug.DrawLine(_controller.transform.position, transform.position + moveDirectionNorm, Color.green);
-
     }
 
     // x = 0
@@ -626,6 +623,47 @@ public class CPMPlayer : MonoBehaviour
     private float toUnityUnits(float QuakeVal)
     {
         return QuakeVal * .0265625f;
+    }
+
+    private void fpsSwitching()
+    {
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            fpsCJ = 125;
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            fpsCJ = 250;
+        }
+        else if (Input.GetKeyDown(KeyCode.C))
+        {
+            fpsCJ = 333;
+        }
+        else if (Input.GetKeyDown(KeyCode.V))
+        {
+            fpsCJ = 500;
+        }
+
+        frametimeQ = 1 / fpsCJ;
+    }
+
+    private float VectorNormalize(ref Vector3 vec)
+    {
+        float result; // st7
+        float lengthSquared; // [esp+4h] [ebp-4h]
+        float v3; // [esp+4h] [ebp-4h]
+        float length; // [esp+4h] [ebp-4h]
+
+        lengthSquared = vec.sqrMagnitude;
+        v3 = MathF.Sqrt(lengthSquared);
+        result = v3;
+        if (-v3 >= 0.0f)
+            v3 = 1.0f;
+        length = 1.0f / v3;
+        vec = vec * length;
+        vec.z = length * vec.z;
+        vec.y = length * vec.y;
+        return result;
     }
 
     private void OnGUI()
