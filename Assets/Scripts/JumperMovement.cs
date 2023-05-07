@@ -6,6 +6,7 @@ using TreeEditor;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Playables;
 using UnityEngine.UIElements;
 using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
@@ -106,6 +107,10 @@ public class JumperMovement : MonoBehaviour
             {
                 Application.targetFrameRate = 333;
             }
+            if (Input.GetKeyDown(KeyCode.Y))
+            {
+                Application.targetFrameRate = 500;
+            }
         }
 
         //Main Calculations go here
@@ -125,7 +130,9 @@ public class JumperMovement : MonoBehaviour
 
             // Move the controller & convert back to unity units
             // This should be the last movement call
-
+            playerVelocity.x = MathF.Round(playerVelocity.x);
+            playerVelocity.z = MathF.Round(playerVelocity.z);
+            playerVelocity.y = MathF.Round(playerVelocity.y);
             _controller.Move(toUnityUnitsVec3(playerVelocity) * Time.deltaTime);
         }
 
@@ -208,18 +215,20 @@ public class JumperMovement : MonoBehaviour
     }
     private bool PM_CheckJump()
     {
-        Debug.DrawLine(transform.position, transform.position - Vector3.up * (_controller.height / 2 + 0.2f), Color.red);
-        //Check Jump checks if player is in air or not
-        if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, _controller.height / 2 + 0.2f))
+        Vector3 raycastOrigin = transform.position + Vector3.up * 0.1f; // Move the raycast origin up slightly
+        Vector3 raycastDirection = -Vector3.up; // Cast the raycast straight down
+
+        Debug.DrawLine(raycastOrigin, raycastOrigin + raycastDirection * (_controller.height / 2 + 0.0f), Color.black);
+
+        if ( _controller.isGrounded)
         {
-            Debug.DrawLine(transform.position, hit.point, Color.green);
-            return true; //True, we are on the ground
+            //Debug.DrawLine(raycastOrigin, hit.point, Color.yellow);
+            return true;
         }
         else
         {
-            return false; //False, we are in the air
+            return false;
         }
-
     }
     private void PM_WalkMove()
     {
@@ -256,7 +265,9 @@ public class JumperMovement : MonoBehaviour
         PM_ProjectVelocity(surfaceNormal, ref playerVelocity, 10);
 
         // Reset the gravity velocity
-        playerVelocity.y = 0;
+        playerVelocity.y = -g_gravity * Time.deltaTime;
+
+
         //Jumping, this MAY NOT BE RIGHT!!! PORTED FROM WIGGLE WIZARD AAAAAAAHHHHHH
         if (Input.GetButtonDown("Jump") && isOnGround)
         {
@@ -280,6 +291,9 @@ public class JumperMovement : MonoBehaviour
         //Vector normalize
         wishdir = transform.TransformDirection(wishdir);
         wishdir.Normalize();
+
+        //for debug drawing
+        wishDirNorm = wishdir;
 
         // normalize returns length before normalizing
         float wishSpeed = wishdir.magnitude * cmdScale;
@@ -475,9 +489,11 @@ public class JumperMovement : MonoBehaviour
         ups.y = 0;
         GUI.Label(new Rect(0, 25, 400, 100), "Speed: " + Mathf.Round(ups.magnitude * 100) / 100 + "ups", style);
         GUI.Label(new Rect(0, 50, 400, 100), "PM_CheckJump: " + isOnGround, style);
-        GUI.Label(new Rect(0, 75, 400, 100), "Velocity X: " + playerVelocity.x, style);
-        GUI.Label(new Rect(0, 100, 400, 100), "Velocity Z: " + playerVelocity.z, style);
-        GUI.Label(new Rect(0, 125, 400, 100), "Velocity Y: " + playerVelocity.y, style);
+        GUI.Label(new Rect(0, 75, 400, 100), "_c.isGrounded: " + _controller.isGrounded, style);
+
+        GUI.Label(new Rect(0, 100, 400, 100), "Velocity X: " + playerVelocity.x, style);
+        GUI.Label(new Rect(0, 125, 400, 100), "Velocity Z: " + playerVelocity.z, style);
+        GUI.Label(new Rect(0, 150, 400, 100), "Velocity Y: " + playerVelocity.y, style);
 
     }
 }
