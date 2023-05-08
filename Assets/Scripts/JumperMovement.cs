@@ -48,6 +48,7 @@ public class JumperMovement : MonoBehaviour
     public float stopspeed = 100f;                           //Player stop/deceleration speed on ground
     public float groundAccel = 9f;                           //Player acceleration on ground
     public float jump_height = 39f;                          //Players Jump Height
+    float fpsCJ = 125f;                                             //Fake FPS to mimic CJ
 
 
     //ShowFPS variables
@@ -63,6 +64,9 @@ public class JumperMovement : MonoBehaviour
     //Debug variables
     public GUIStyle style;                                   //GUI Style for debugging
     int bounceCounter = 0;                                   //Count bounces from PM_ProjectVelocity
+
+    //Time for fakeFPS counter
+    float timer = 0.0f; // Initialize the timer
 
     private void Start()
     {
@@ -95,6 +99,7 @@ public class JumperMovement : MonoBehaviour
         {
             QualitySettings.vSyncCount = 0;
 
+            //Real engine FPS
             if (Input.GetKeyDown(KeyCode.Z))
             {
                 Application.targetFrameRate = 125;
@@ -115,19 +120,19 @@ public class JumperMovement : MonoBehaviour
             //Fake FPS
             if (Input.GetKeyDown(KeyCode.E))
             {
-                Application.targetFrameRate = 125;
+                fpsCJ = 125;
             }
             if (Input.GetKeyDown(KeyCode.R))
             {
-                Application.targetFrameRate = 250;
+                fpsCJ = 250;
             }
             if (Input.GetKeyDown(KeyCode.T))
             {
-                Application.targetFrameRate = 333;
+                fpsCJ = 333;
             }
             if (Input.GetKeyDown(KeyCode.Y))
             {
-                Application.targetFrameRate = 500;
+                fpsCJ = 500;
             }
         }
 
@@ -203,9 +208,10 @@ public class JumperMovement : MonoBehaviour
     }
     private void PM_Accelerate(Vector3 wishdir, float wishspeed, float accel)
     {
+        float frametimeQ = 1 / fpsCJ;
         Vector3 velocityLocal = playerVelocity;
         float value;
-
+        float accelspeed = 0;
         float currentspeed = Vector3.Dot(velocityLocal, wishdir);
         float addspeed = wishspeed - currentspeed; // 190 - current speed
 
@@ -216,7 +222,26 @@ public class JumperMovement : MonoBehaviour
             else
                 value = 100;
 
-            float accelspeed = accel * Time.deltaTime * value;
+            //custom in air vs ground (not ported)
+            if (isOnGround) //On ground use time delta
+                accelspeed = accel * Time.deltaTime * value;
+             //In air use custom fps stuff
+            {
+                float deltaTime = Time.deltaTime; // Get the time elapsed since last frame
+
+                timer += deltaTime; // Add the elapsed time to the timer
+
+                while (timer >= frametimeQ) // If we've reached the target delta time, calculate the acceleration
+                {
+                    accelspeed = accel * frametimeQ * value; // Calculate acceleration
+                                                                        // Use the acceleration here
+                    timer -= frametimeQ; // Subtract the target delta time from the timer
+                }
+
+            }
+
+
+            Debug.Log("accelspeed:" + accelspeed);
             if (accelspeed > addspeed)
                 accelspeed = addspeed;
 
@@ -319,8 +344,9 @@ public class JumperMovement : MonoBehaviour
         if (isOnGround)
             PM_ClipVelocity(ref playerVelocity, surfaceNormal, ref playerVelocity);
 
-        //Gravity, this MAY NOT BE RIGHT!!! PORTED FROM WIGGLE WIZARD AAAAAAAHHHHHH
-        float resultingGravity = MathF.Abs(g_gravity * Time.deltaTime);
+        //Gravity, this MAY NOT BE RIGHT!!! PORTED FROM WIGGLE WIZARD AAAAAAAHHHHHH (and cj fps fuckk)
+        float gravityPerFrame = MathF.Round(g_gravity / fpsCJ);
+        float resultingGravity = MathF.Abs(gravityPerFrame * Time.deltaTime * fpsCJ);
         // Apply gravity
         playerVelocity.y -= resultingGravity;
 
@@ -501,22 +527,24 @@ public class JumperMovement : MonoBehaviour
     }
     private void OnGUI()
     {
+        int offset = 25;
         style.fontSize = 28;
         GUI.Label(new Rect(0, 0, 400, 100), "FPS: " + fps, style);
+        GUI.Label(new Rect(0, 0 + offset, 400, 100), "CJ FPS: " + fpsCJ, style);
         var ups = _controller.velocity;
         ups.y = 0;
-        GUI.Label(new Rect(0, 25, 400, 100), "Speed: " + Mathf.Round(ups.magnitude * 100) / 100 + "ups", style);
-        GUI.Label(new Rect(0, 50, 400, 100), "PM_CheckJump: " + isOnGround, style);
-        GUI.Label(new Rect(0, 75, 400, 100), "_c.isGrounded: " + _controller.isGrounded, style);
+        GUI.Label(new Rect(0, 25 + offset, 400, 100), "Speed: " + Mathf.Round(ups.magnitude * 100) / 100 + "ups", style);
+        GUI.Label(new Rect(0, 50 + offset, 400, 100), "PM_CheckJump: " + isOnGround, style);
+        GUI.Label(new Rect(0, 75 + offset, 400, 100), "_c.isGrounded: " + _controller.isGrounded, style);
 
         //Velocity
-        GUI.Label(new Rect(0, 100, 400, 100), "Velocity X: " + playerVelocity.x, style);
-        GUI.Label(new Rect(0, 125, 400, 100), "Velocity Z: " + playerVelocity.z, style);
-        GUI.Label(new Rect(0, 150, 400, 100), "Velocity Y: " + playerVelocity.y, style);
+        GUI.Label(new Rect(0, 100 + offset, 400, 100), "Velocity X: " + playerVelocity.x, style);
+        GUI.Label(new Rect(0, 125 + offset, 400, 100), "Velocity Z: " + playerVelocity.z, style);
+        GUI.Label(new Rect(0, 150 + offset, 400, 100), "Velocity Y: " + playerVelocity.y, style);
 
         //View Angles
-        GUI.Label(new Rect(0, 175, 400, 100), "View X: " + rotX, style);
-        GUI.Label(new Rect(0, 225, 400, 100), "View Y: " + rotY, style);
+        GUI.Label(new Rect(0, 175 + offset, 400, 100), "View X: " + rotX, style);
+        GUI.Label(new Rect(0, 225 + offset, 400, 100), "View Y: " + rotY, style);
 
     }
 }
