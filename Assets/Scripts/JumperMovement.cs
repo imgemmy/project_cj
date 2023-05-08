@@ -95,6 +95,24 @@ public class JumperMovement : MonoBehaviour
         {
             QualitySettings.vSyncCount = 0;
 
+            if (Input.GetKeyDown(KeyCode.Z))
+            {
+                Application.targetFrameRate = 125;
+            }
+            if (Input.GetKeyDown(KeyCode.X))
+            {
+                Application.targetFrameRate = 250;
+            }
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                Application.targetFrameRate = 333;
+            }
+            if (Input.GetKeyDown(KeyCode.V))
+            {
+                Application.targetFrameRate = 500;
+            }
+
+            //Fake FPS
             if (Input.GetKeyDown(KeyCode.E))
             {
                 Application.targetFrameRate = 125;
@@ -208,9 +226,9 @@ public class JumperMovement : MonoBehaviour
 
         }
 
-        playerVelocity.x = Mathf.Round(velocityLocal.x);
-        playerVelocity.y = Mathf.Round(velocityLocal.y);
-        playerVelocity.z = Mathf.Round(velocityLocal.z);
+        playerVelocity.x = velocityLocal.x;
+        playerVelocity.y = velocityLocal.y;
+        playerVelocity.z = velocityLocal.z;
 
     }
     private bool PM_CheckJump()
@@ -280,7 +298,7 @@ public class JumperMovement : MonoBehaviour
     }
     private void PM_AirMove()
     {
-        PM_SetMovementDir();
+
         PM_Friction();
 
         float cmdScale = g_speed;
@@ -301,12 +319,12 @@ public class JumperMovement : MonoBehaviour
         if (isOnGround)
             PM_ClipVelocity(ref playerVelocity, surfaceNormal, ref playerVelocity);
 
-
-
         //Gravity, this MAY NOT BE RIGHT!!! PORTED FROM WIGGLE WIZARD AAAAAAAHHHHHH
         float resultingGravity = MathF.Abs(g_gravity * Time.deltaTime);
         // Apply gravity
         playerVelocity.y -= resultingGravity;
+
+        PM_SetMovementDir();
     }
     private void PM_Friction()
     {
@@ -491,9 +509,14 @@ public class JumperMovement : MonoBehaviour
         GUI.Label(new Rect(0, 50, 400, 100), "PM_CheckJump: " + isOnGround, style);
         GUI.Label(new Rect(0, 75, 400, 100), "_c.isGrounded: " + _controller.isGrounded, style);
 
+        //Velocity
         GUI.Label(new Rect(0, 100, 400, 100), "Velocity X: " + playerVelocity.x, style);
         GUI.Label(new Rect(0, 125, 400, 100), "Velocity Z: " + playerVelocity.z, style);
         GUI.Label(new Rect(0, 150, 400, 100), "Velocity Y: " + playerVelocity.y, style);
+
+        //View Angles
+        GUI.Label(new Rect(0, 175, 400, 100), "View X: " + rotX, style);
+        GUI.Label(new Rect(0, 225, 400, 100), "View Y: " + rotY, style);
 
     }
 }
